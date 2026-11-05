@@ -15,20 +15,33 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import click
+import mysql.connector
 from flask import (
     Flask, Response, abort, flash, g, redirect, render_template, request,
     session, url_for
 )
+from dotenv import load_dotenv
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "database.db"
+load_dotenv(BASE_DIR / ".env")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get(
     "AGRI_SECRET_KEY", "change-this-development-secret-before-deployment"
 )
 app.config["DATABASE"] = str(DATABASE)
+app.config["DB_TYPE"] = os.environ.get(
+    "DB_TYPE", "mysql" if os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") else "sqlite"
+).strip().lower()
+app.config["MYSQL_CONFIG"] = {
+    "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST", ""),
+    "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT", "3306")),
+    "user": os.environ.get("DB_USER") or os.environ.get("MYSQLUSER", ""),
+    "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD", ""),
+    "database": os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE", ""),
+}
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "").strip()
 app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", "587"))
@@ -95,6 +108,80 @@ def product_image_url(product):
 
 
 app.jinja_env.globals["product_image_url"] = product_image_url
+
+DATABASE_ERRORS = (sqlite3.Error, mysql.connector.Error)
+DATABASE_INTEGRITY_ERRORS = (sqlite3.IntegrityError, mysql.connector.IntegrityError)
+VALUE_OR_DATABASE_ERRORS = (ValueError,) + DATABASE_ERRORS
+KEY_OR_DATABASE_ERRORS = (KeyError,) + DATABASE_ERRORS
+
+
+class DatabaseRow(dict):
+    """Provide SQLite-compatible name and positional access to MySQL rows."""
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return tuple(self.values())[key]
+        return super().__getitem__(key)
+
+
+class MySQLCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self._lastrowid = cursor.lastrowid
+        self._rowcount = cursor.rowcount
+        if not cursor.with_rows:
+            cursor.close()
+
+    @property
+    def lastrowid(self):
+        return self._lastrowid
+
+    @property
+    def rowcount(self):
+        return self._rowcount
+
+    def fetchone(self):
+        try:
+            row = self._cursor.fetchone()
+        finally:
+            self._cursor.close()
+        return DatabaseRow(row) if row is not None else None
+
+    def fetchall(self):
+        try:
+            return [DatabaseRow(row) for row in self._cursor.fetchall()]
+        finally:
+            self._cursor.close()
+
+    def close(self):
+        self._cursor.close()
+
+
+class MySQLConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, args=()):
+        if query.strip().upper() == "BEGIN IMMEDIATE":
+            query = "START TRANSACTION"
+        else:
+            query = query.replace("?", "%s")
+        cursor = self._connection.cursor(dictionary=True)
+        try:
+            cursor.execute(query, args)
+        except mysql.connector.Error:
+            cursor.close()
+            raise
+        return MySQLCursor(cursor)
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
+
+    def close(self):
+        self._connection.close()
 
 
 def is_valid_email(email):
@@ -255,11 +342,28 @@ def send_account_token(user, token, purpose):
 # DATABASE CONNECTION
 # -----------------------------
 def get_db():
-    """Return one SQLite connection for the current request."""
+    """Return one database connection for the current request."""
     if "db" not in g:
-        g.db = sqlite3.connect(app.config["DATABASE"])
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
+        if app.config["DB_TYPE"] == "mysql":
+            mysql_config = app.config["MYSQL_CONFIG"]
+            missing = [
+                key for key in ("host", "user", "password", "database")
+                if not mysql_config[key]
+            ]
+            if missing:
+                raise RuntimeError(
+                    "MySQL is selected but its connection settings are incomplete: "
+                    + ", ".join(missing)
+                )
+            g.db = MySQLConnection(
+                mysql.connector.connect(**mysql_config, autocommit=False)
+            )
+        elif app.config["DB_TYPE"] == "sqlite":
+            g.db = sqlite3.connect(app.config["DATABASE"])
+            g.db.row_factory = sqlite3.Row
+            g.db.execute("PRAGMA foreign_keys = ON")
+        else:
+            raise RuntimeError("DB_TYPE must be either 'sqlite' or 'mysql'.")
     return g.db
 
 
@@ -282,6 +386,20 @@ def query_db(query, args=(), one=False):
 @app.before_request
 def migrate_runtime_schema():
     """Apply additive upgrades required by current routes to existing databases."""
+    if app.config["DB_TYPE"] == "mysql":
+        migrated_databases = app.extensions.setdefault("agri_supply_migrations", set())
+        if "mysql" in migrated_databases:
+            return
+        try:
+            get_db().execute("SELECT user_id FROM users LIMIT 0").close()
+        except mysql.connector.Error as error:
+            raise RuntimeError(
+                "The MySQL schema is not initialized. Run 'flask init-db' before "
+                "starting the application."
+            ) from error
+        migrated_databases.add("mysql")
+        return
+
     database_path = app.config["DATABASE"]
     migrated_databases = app.extensions.setdefault("agri_supply_migrations", set())
     if database_path in migrated_databases:
@@ -360,6 +478,92 @@ def migrate_runtime_schema():
     migrated_databases.add(database_path)
 
 
+@app.cli.command("init-db")
+def init_db_command():
+    """Create the database schema for the configured database backend."""
+    if app.config["DB_TYPE"] == "mysql":
+        schema_path = BASE_DIR / "database" / "schema.mysql.sql"
+        statements = schema_path.read_text(encoding="utf-8").split(";")
+        db = get_db()
+        try:
+            for statement in statements:
+                if statement.strip():
+                    db.execute(statement).close()
+            db.commit()
+        except mysql.connector.Error as error:
+            db.rollback()
+            raise click.ClickException(f"Could not initialize MySQL schema: {error}") from error
+        click.echo("MySQL schema initialized.")
+        return
+
+    db = sqlite3.connect(app.config["DATABASE"])
+    try:
+        schema_path = BASE_DIR / "database" / "schema.sql"
+        db.executescript(schema_path.read_text(encoding="utf-8"))
+    except sqlite3.Error as error:
+        raise click.ClickException(f"Could not initialize SQLite schema: {error}") from error
+    finally:
+        db.close()
+    click.echo("SQLite schema initialized.")
+
+
+@app.cli.command("migrate-sqlite-to-mysql")
+@click.option(
+    "--source",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DATABASE,
+    show_default=True,
+    help="SQLite database file to copy into the configured MySQL database."
+)
+def migrate_sqlite_to_mysql_command(source):
+    """Copy all application data from SQLite to an initialized MySQL database."""
+    if app.config["DB_TYPE"] != "mysql":
+        raise click.ClickException("Set DB_TYPE=mysql and configure MySQL before migrating.")
+
+    table_order = (
+        "users", "suppliers", "categories", "customers", "products", "inventory",
+        "transactions", "account_tokens", "order_status_history",
+    )
+    target_db = get_db()
+    source_db = sqlite3.connect(source)
+    source_db.row_factory = sqlite3.Row
+    copied = {}
+    try:
+        for table in table_order:
+            exists = source_db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (table,)
+            ).fetchone()
+            if exists is None:
+                copied[table] = 0
+                continue
+            rows = source_db.execute(f"SELECT * FROM {table}").fetchall()
+            if not rows:
+                copied[table] = 0
+                continue
+            columns = rows[0].keys()
+            column_sql = ", ".join(f"`{column}`" for column in columns)
+            placeholders = ", ".join("?" for _ in columns)
+            insert_sql = (
+                f"INSERT INTO `{table}` ({column_sql}) VALUES ({placeholders})"
+            )
+            for row in rows:
+                target_db.execute(insert_sql, tuple(row[column] for column in columns)).close()
+            copied[table] = len(rows)
+        target_db.commit()
+    except (sqlite3.Error, mysql.connector.Error) as error:
+        target_db.rollback()
+        raise click.ClickException(
+            f"SQLite data migration failed; MySQL changes were rolled back: {error}"
+        ) from error
+    finally:
+        source_db.close()
+
+    for table, count in copied.items():
+        click.echo(f"{table}: {count} rows")
+    click.echo("SQLite data copied to MySQL.")
+
+
 ALLOWED_IMAGE_SIGNATURES = {
     ".jpg": lambda header: header.startswith(b"\xff\xd8\xff"),
     ".jpeg": lambda header: header.startswith(b"\xff\xd8\xff"),
@@ -419,7 +623,7 @@ def create_admin_command(email, name):
     if len(password) < 8:
         raise click.ClickException("Password must contain at least 8 characters.")
 
-    db = sqlite3.connect(app.config["DATABASE"])
+    db = get_db()
     try:
         db.execute(
             """INSERT INTO users (full_name, email, password_hash, role)
@@ -427,11 +631,9 @@ def create_admin_command(email, name):
             (name, email, generate_password_hash(password))
         )
         db.commit()
-    except sqlite3.IntegrityError as error:
+    except DATABASE_INTEGRITY_ERRORS as error:
         db.rollback()
         raise click.ClickException("That email address is already registered.") from error
-    finally:
-        db.close()
     click.echo(f"Administrator account created for {email}.")
 
 
@@ -561,7 +763,7 @@ def register():
             )
             token = create_account_token(db, user_id, "verify_email")
             db.commit()
-        except sqlite3.IntegrityError:
+        except DATABASE_INTEGRITY_ERRORS:
             db.rollback()
             flash("That email address is already registered.", "danger")
             return render_template("auth/register.html")
@@ -900,10 +1102,10 @@ def customer_profile():
                     return redirect(url_for("login"))
                 flash("Your profile has been updated.", "success")
                 return redirect(url_for("customer_profile"))
-            except sqlite3.IntegrityError:
+            except DATABASE_INTEGRITY_ERRORS:
                 db.rollback()
                 flash("That email address is already in use.", "danger")
-            except sqlite3.Error:
+            except DATABASE_ERRORS:
                 db.rollback()
                 flash("Could not update your profile. Please try again.", "danger")
 
@@ -1100,13 +1302,17 @@ def checkout():
             )
             for product_id, quantity in cart_items.items():
                 quantity = int(quantity)
+                lock_clause = (
+                    " FOR UPDATE" if app.config["DB_TYPE"] == "mysql" else ""
+                )
                 product = db.execute(
                     """SELECT p.product_id, p.price, i.quantity
                        FROM products p
                        JOIN inventory i ON i.product_id = p.product_id
                        LEFT JOIN suppliers s ON s.supplier_id = p.supplier_id
                        WHERE p.product_id = ? AND p.is_available = 1
-                         AND (p.supplier_id IS NULL OR s.is_active = 1)""",
+                         AND (p.supplier_id IS NULL OR s.is_active = 1)"""
+                    + lock_clause,
                     (int(product_id),)
                 ).fetchone()
                 if product is None or product["quantity"] < quantity:
@@ -1136,7 +1342,7 @@ def checkout():
                 (order_reference,)
             )
             db.commit()
-        except (ValueError, sqlite3.Error) as error:
+        except VALUE_OR_DATABASE_ERRORS as error:
             db.rollback()
             flash(str(error) or "Could not place your order. Please try again.", "danger")
             return redirect(url_for("cart"))
@@ -1263,7 +1469,7 @@ def admin_dashboard():
         )["total"],
         "today_orders": query_db(
             """SELECT COUNT(DISTINCT order_reference) AS total FROM transactions
-               WHERE DATE(order_date) = DATE('now')""",
+               WHERE DATE(order_date) = CURRENT_DATE""",
             one=True
         )["total"],
         "low_stock": query_db(
@@ -1333,7 +1539,7 @@ def admin_suppliers():
                 )
                 db.commit()
                 flash("Supplier added.", "success")
-            except sqlite3.Error:
+            except DATABASE_ERRORS:
                 db.rollback()
                 flash("Could not add the supplier. Please try again.", "danger")
         return redirect(url_for("admin_suppliers"))
@@ -1374,7 +1580,7 @@ def edit_supplier(supplier_id):
             db.commit()
             flash("Supplier updated.", "success")
             return redirect(url_for("admin_suppliers"))
-        except sqlite3.Error:
+        except DATABASE_ERRORS:
             get_db().rollback()
             flash("Could not update the supplier. Please try again.", "danger")
     return render_template("admin/supplier_edit.html", supplier=supplier)
@@ -1427,7 +1633,7 @@ def admin_products():
             ) is None:
                 raise ValueError("Choose an active supplier.")
             saved_image = save_product_image(request.files.get("image"))
-            db.execute(
+            cursor = db.execute(
                 """INSERT INTO products
                    (supplier_id, category_id, product_name, description, unit,
                     price, image_filename)
@@ -1442,7 +1648,7 @@ def admin_products():
                     saved_image
                 )
             )
-            new_product_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            new_product_id = cursor.lastrowid
             db.execute(
                 """INSERT INTO inventory (product_id, quantity, reorder_level)
                    VALUES (?, ?, ?)""",
@@ -1454,7 +1660,7 @@ def admin_products():
             db.rollback()
             remove_uploaded_product_image(saved_image)
             flash(str(error) or "Please check the product details and try again.", "danger")
-        except (KeyError, sqlite3.Error):
+        except KEY_OR_DATABASE_ERRORS:
             db.rollback()
             remove_uploaded_product_image(saved_image)
             flash("Please check the product details and try again.", "danger")
@@ -1534,7 +1740,7 @@ def edit_product(product_id):
             db.rollback()
             remove_uploaded_product_image(saved_image)
             flash(str(error) or "Please enter valid product details.", "danger")
-        except (KeyError, sqlite3.Error):
+        except KEY_OR_DATABASE_ERRORS:
             db.rollback()
             remove_uploaded_product_image(saved_image)
             flash("Could not update the product. Check the details and try again.", "danger")
@@ -1615,23 +1821,29 @@ def update_inventory(product_id):
         )
         if product is None:
             abort(404)
-        db.execute(
-            """UPDATE inventory
-               SET quantity = ?, reorder_level = ?, last_updated = CURRENT_TIMESTAMP
-               WHERE product_id = ?""",
-            (quantity, reorder_level, product_id)
+        inventory = query_db(
+            "SELECT inventory_id FROM inventory WHERE product_id = ?",
+            (product_id,),
+            one=True
         )
-        if db.execute("SELECT changes()").fetchone()[0] == 0:
+        if inventory is None:
             db.execute(
                 "INSERT INTO inventory (product_id, quantity, reorder_level) VALUES (?, ?, ?)",
                 (product_id, quantity, reorder_level)
+            )
+        else:
+            db.execute(
+                """UPDATE inventory
+                   SET quantity = ?, reorder_level = ?, last_updated = CURRENT_TIMESTAMP
+                   WHERE product_id = ?""",
+                (quantity, reorder_level, product_id)
             )
         db.commit()
         flash("Inventory updated.", "success")
     except (KeyError, ValueError):
         db.rollback()
         flash("Enter valid non-negative stock and reorder values.", "danger")
-    except sqlite3.Error:
+    except DATABASE_ERRORS:
         db.rollback()
         flash("Could not update inventory. Please try again.", "danger")
     return redirect(url_for("admin_inventory"))
@@ -1651,6 +1863,11 @@ def admin_customers():
 @app.route("/admin/transactions")
 @admin_required
 def admin_transactions():
+    products_expression = (
+        "GROUP_CONCAT(CONCAT(p.product_name, ' × ', t.quantity) SEPARATOR ', ')"
+        if app.config["DB_TYPE"] == "mysql"
+        else "GROUP_CONCAT(p.product_name || ' × ' || t.quantity, ', ')"
+    )
     transactions = query_db(
         """SELECT t.order_reference, MIN(t.order_date) AS order_date,
                   SUM(t.quantity) AS quantity, SUM(t.total_amount) AS total_amount,
@@ -1660,13 +1877,15 @@ def admin_transactions():
                   MIN(t.order_status) AS order_status,
                   MIN(t.delivery_address) AS delivery_address,
                   u.full_name,
-                  GROUP_CONCAT(p.product_name || ' × ' || t.quantity, ', ') AS products
+                  {products_expression} AS products
            FROM transactions t
            JOIN customers c ON c.customer_id = t.customer_id
            LEFT JOIN users u ON u.user_id = c.user_id
            JOIN products p ON p.product_id = t.product_id
            GROUP BY t.order_reference, c.customer_id, u.full_name
-           ORDER BY t.order_date DESC"""
+           ORDER BY order_date DESC""".format(
+            products_expression=products_expression
+        )
     )
     return render_template("admin/transactions.html", transactions=transactions)
 
@@ -1703,25 +1922,25 @@ def update_order_status(order_reference):
         db.execute("BEGIN IMMEDIATE")
         if order_status == "cancelled" and previous_status != "cancelled":
             for line in lines:
-                db.execute(
+                cursor = db.execute(
                     "UPDATE inventory SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP "
                     "WHERE product_id = ?",
                     (line["quantity"], line["product_id"])
                 )
-                if db.execute("SELECT changes()").fetchone()[0] == 0:
+                if cursor.rowcount == 0:
                     db.execute(
                         "INSERT INTO inventory (product_id, quantity) VALUES (?, ?)",
                         (line["product_id"], line["quantity"])
                     )
         elif previous_status == "cancelled" and order_status != "cancelled":
             for line in lines:
-                db.execute(
+                cursor = db.execute(
                     """UPDATE inventory SET quantity = quantity - ?,
                            last_updated = CURRENT_TIMESTAMP
                        WHERE product_id = ? AND quantity >= ?""",
                     (line["quantity"], line["product_id"], line["quantity"])
                 )
-                if db.execute("SELECT changes()").fetchone()[0] == 0:
+                if cursor.rowcount == 0:
                     raise ValueError("There is not enough stock to reopen this order.")
         db.execute(
             "UPDATE transactions SET order_status = ? WHERE order_reference = ?",
@@ -1734,7 +1953,7 @@ def update_order_status(order_reference):
                 (order_reference, order_status)
             )
         db.commit()
-    except (ValueError, sqlite3.Error) as error:
+    except VALUE_OR_DATABASE_ERRORS as error:
         db.rollback()
         flash(str(error) or "Could not update the order. Please try again.", "danger")
         return redirect(url_for("admin_transactions"))
@@ -1794,14 +2013,14 @@ def mark_cash_collected(order_reference):
         flash("This order does not have a pending cash payment.", "warning")
         return redirect(url_for("admin_transactions"))
 
-    db.execute(
+    cursor = db.execute(
         """UPDATE transactions
            SET payment_status = 'paid', payment_received_at = CURRENT_TIMESTAMP
            WHERE order_reference = ? AND payment_method = 'cash_on_delivery'
              AND payment_status = 'pending' AND order_status = 'delivered'""",
         (order_reference,)
     )
-    if db.execute("SELECT changes()").fetchone()[0] == 0:
+    if cursor.rowcount == 0:
         db.rollback()
         flash("Cash payment could not be confirmed. Refresh and check the order.", "danger")
         return redirect(url_for("admin_transactions"))

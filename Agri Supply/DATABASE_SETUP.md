@@ -32,7 +32,14 @@ The migration command copies the local `database.db` data into MySQL. It is a
 one-time copy, not a repeatable sync; do not run it again after a successful
 migration because existing rows will cause it to stop and roll back.
 
-After deploying, set the same MySQL environment variables in the web service.
-For Render, set the service's Root Directory to `Agri Supply`, use
-`pip install -r requirements.txt` as the build command, and
-`gunicorn app:app` as the start command.
+The repository-root `render.yaml` configures the Render web service, installs
+the requirements, initializes the MySQL schema at startup, and generates the
+Flask secret key. In Render's Blueprint setup, provide the database host, user,
+password, and name when prompted. Keep these values private.
+
+The Render service starts with an empty database until the SQLite migration is
+run. For the one-time data copy, the MySQL host must allow a connection from
+your computer; if the provider offers private-only networking, use a temporary
+secure tunnel or another migration method supported by that provider. Do not
+make the database publicly accessible without provider-supported access
+controls.

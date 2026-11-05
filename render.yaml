@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: agri-supply
+    runtime: python
+    plan: free
+    rootDir: Agri Supply
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m flask --app app init-db && gunicorn app:app
+    healthCheckPath: /
+    envVars:
+      - key: DB_TYPE
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: AGRI_SECRET_KEY
+        generateValue: true

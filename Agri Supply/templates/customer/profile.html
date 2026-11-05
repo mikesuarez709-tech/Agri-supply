@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}My Profile | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container profile-layout">
+  <div class="section-heading"><div><span class="eyebrow">ACCOUNT SETTINGS</span><h1>My Profile</h1><p class="muted">Keep your contact and delivery details up to date.</p></div><a class="btn btn-light" href="{{ url_for('customer_dashboard') }}">← My Account</a></div>
+  <form method="POST" class="profile-form">
+    <div class="profile-form-section">
+      <h2>Personal information</h2>
+      <label>Full name<input type="text" name="full_name" value="{{ profile['full_name'] }}" autocomplete="name" required></label>
+      <label>Email address<input type="email" name="email" value="{{ profile['email'] }}" maxlength="254" autocomplete="email" required></label>
+      <p class="muted">Changing your email address requires verifying the new address before you can log in again.</p>
+      <label>Phone number<input type="tel" name="phone" value="{{ profile['phone'] or '' }}" autocomplete="tel" placeholder="09XX XXX XXXX"></label>
+      <label>Delivery address<textarea name="delivery_address" rows="3" autocomplete="street-address" placeholder="House number, street, barangay">{{ profile['delivery_address'] or '' }}</textarea></label>
+    </div>
+    <div class="profile-form-section">
+      <h2>Change password <small>Optional</small></h2>
+      <p class="muted">Leave these fields blank if you do not want to change your password.</p>
+      <label>Current password<div class="password-field"><input id="profile-current-password" type="password" name="current_password" autocomplete="current-password"><button class="password-toggle" type="button" aria-controls="profile-current-password" aria-label="Show password" aria-pressed="false">Show</button></div></label>
+      <label>New password<div class="password-field"><input id="profile-new-password" type="password" name="new_password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters"><button class="password-toggle" type="button" aria-controls="profile-new-password" aria-label="Show password" aria-pressed="false">Show</button></div></label>
+      <label>Confirm new password<div class="password-field"><input id="profile-confirm-password" type="password" name="confirm_password" minlength="8" autocomplete="new-password"><button class="password-toggle" type="button" aria-controls="profile-confirm-password" aria-label="Show password" aria-pressed="false">Show</button></div></label>
+    </div>
+    <div class="profile-actions"><button class="btn btn-primary" type="submit">Save Changes</button><a class="btn btn-light" href="{{ url_for('customer_dashboard') }}">Cancel</a></div>
+  </form>
+</div></section>
+{% endblock %}

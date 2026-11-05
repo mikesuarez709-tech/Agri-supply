@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}My Account | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container"><span class="eyebrow">CUSTOMER SPACE</span><h1>Welcome, {{ g.user['full_name'] }}!</h1><p class="muted">Manage your shopping and orders from here.</p><div class="dashboard-cards"><a class="dashboard-tile" href="{{ url_for('customer_products') }}"><span>🛍️</span><h3>Browse Products</h3><p>Explore rice and vegetables.</p></a><a class="dashboard-tile" href="{{ url_for('cart') }}"><span>🛒</span><h3>My Cart</h3><p>Review items before checkout.</p></a><a class="dashboard-tile" href="{{ url_for('orders') }}"><span>📦</span><h3>My Orders</h3><p>Review your order history.</p></a><a class="dashboard-tile" href="{{ url_for('track_order') }}"><span>🚚</span><h3>Track Order</h3><p>Check your order status.</p></a><a class="dashboard-tile" href="{{ url_for('customer_profile') }}"><span>👤</span><h3>My Profile</h3><p>Update your contact, address, and password.</p></a></div></div></section>
+{% endblock %}

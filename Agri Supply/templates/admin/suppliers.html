@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Suppliers | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <div class="section-heading"><div><span class="eyebrow">ADMIN / SUPPLIERS</span><h1>Supplier management</h1></div><a class="btn btn-light" href="{{ url_for('admin_dashboard') }}">← Dashboard</a></div>
+  <form method="POST" class="admin-form">
+    <label>Supplier name<input name="supplier_name" required></label><label>Contact person<input name="contact_person"></label><label>Phone<input name="phone"></label><label>Email<input type="email" name="email"></label><label class="wide-field">Address<input name="address"></label><button class="btn btn-primary" type="submit">Add Supplier</button>
+  </form>
+  <div class="table-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Email</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+  {% for supplier in suppliers %}<tr><td>{{ supplier['supplier_name'] }}</td><td>{{ supplier['contact_person'] or '—' }}</td><td>{{ supplier['phone'] or '—' }}</td><td>{{ supplier['email'] or '—' }}</td><td>{{ supplier['address'] or '—' }}</td><td><span class="status">{{ 'Active' if supplier['is_active'] else 'Disabled' }}</span></td>
+    <td class="admin-actions"><a class="btn btn-small btn-light" href="{{ url_for('edit_supplier', supplier_id=supplier['supplier_id']) }}">Edit</a><form method="POST" action="{{ url_for('toggle_supplier', supplier_id=supplier['supplier_id']) }}"><button class="btn btn-small btn-light" type="submit">{{ 'Disable' if supplier['is_active'] else 'Enable' }}</button></form></td>
+  </tr>{% else %}<tr><td colspan="7">No suppliers found.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div></section>
+{% endblock %}

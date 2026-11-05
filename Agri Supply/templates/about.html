@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}About | Agri Supply{% endblock %}
+{% block content %}
+<section class="page-hero"><div class="container"><span class="eyebrow">ABOUT AGRI SUPPLY</span><h1>Connecting farms and families.</h1><p>Agri Supply is an agricultural e-commerce project that makes rice and vegetables easier to discover and order.</p></div></section>
+<section class="section"><div class="container split-section"><div class="illustration-panel">🌾<span>🥬</span><span>🍅</span></div><div><span class="eyebrow">OUR PURPOSE</span><h2>Making local products more accessible.</h2><p class="muted">Our platform is designed to connect customers with agricultural suppliers through a convenient online marketplace. Customers can browse products, place orders, and monitor their order status.</p><p class="muted">The admin side helps manage suppliers, products, inventory, transactions, and sales reports in one place.</p><a class="btn btn-primary" href="{{ url_for('customer_products') }}">Explore Marketplace →</a></div></div></section>
+{% endblock %}

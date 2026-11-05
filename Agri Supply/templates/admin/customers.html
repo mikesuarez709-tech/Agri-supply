@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}Customers | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container"><div class="section-heading"><div><span class="eyebrow">ADMIN / CUSTOMERS</span><h1>Customer records</h1></div><a class="btn btn-light" href="{{ url_for('admin_dashboard') }}">← Dashboard</a></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Delivery address</th></tr></thead><tbody>{% for c in customers %}<tr><td>{{ c['full_name'] or '—' }}</td><td>{{ c['email'] or '—' }}</td><td>{{ c['phone'] or '—' }}</td><td>{{ c['delivery_address'] or '—' }}</td></tr>{% else %}<tr><td colspan="4">No customers found.</td></tr>{% endfor %}</tbody></table></div></div></section>
+{% endblock %}

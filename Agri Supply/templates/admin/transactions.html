@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Transactions | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <div class="section-heading"><div><span class="eyebrow">ADMIN / TRANSACTIONS</span><h1>Customer orders</h1></div><a class="btn btn-light" href="{{ url_for('admin_dashboard') }}">← Dashboard</a></div>
+  <p class="notice">For cash on delivery, update the order to Delivered after drop-off, then confirm cash collection to mark the payment as paid.</p>
+  <div class="table-wrap"><table><thead><tr><th>Order reference</th><th>Customer</th><th>Products</th><th>Total</th><th>Payment</th><th>Delivery address</th><th>Date</th><th>Update status</th></tr></thead><tbody>
+  {% for order in transactions %}
+  <tr>
+    <td>{{ order['order_reference'] }}</td><td>{{ order['full_name'] or '—' }}</td><td>{{ order['products'] }}</td><td>₱{{ '%.2f'|format(order['total_amount']) }}</td><td>{{ order['payment_method']|replace('_', ' ')|title }} / {{ order['payment_status']|title }}{% if order['payment_received_at'] %}<br><small>Collected: {{ order['payment_received_at'] }}</small>{% endif %}</td><td>{{ order['delivery_address'] or '—' }}</td><td>{{ order['order_date'] }}</td>
+    <td><form class="status-form" method="POST" action="{{ url_for('update_order_status', order_reference=order['order_reference']) }}">
+      <label>Order<select name="order_status">{% for status in ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] %}<option value="{{ status }}" {% if order['order_status'] == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select></label>
+      <button class="btn btn-small btn-primary" type="submit">Save</button>
+    </form></td>
+  </tr>
+  {% if order['payment_method'] == 'cash_on_delivery' and order['order_status'] == 'delivered' and order['payment_status'] == 'pending' %}
+  <tr><td colspan="7">Cash collection</td><td><form method="POST" action="{{ url_for('mark_cash_collected', order_reference=order['order_reference']) }}"><button class="btn btn-small btn-primary" type="submit">Confirm cash collected</button></form></td></tr>
+  {% endif %}
+  {% else %}<tr><td colspan="8">No transactions found.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div></section>
+{% endblock %}

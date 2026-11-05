@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Checkout | Agri Supply{% endblock %}
+{% block content %}
+<section class="auth-section"><div class="auth-card">
+  <span class="eyebrow">ALMOST THERE</span><h1>Checkout</h1><p class="muted">Confirm your delivery details and choose cash on delivery.</p>
+  <form method="POST" class="form-stack">
+    <label>Delivery address<textarea name="delivery_address" rows="3" required autocomplete="street-address" placeholder="House number, street, barangay">{{ delivery_address }}</textarea></label>
+    <label>Contact phone<input type="tel" name="phone" value="{{ phone }}" autocomplete="tel" placeholder="09XX XXX XXXX"></label>
+    <div class="notice"><strong>Payment: Cash on Delivery</strong><br>Pay the delivery person in cash when your order arrives. Your payment will remain pending until the shop confirms that the cash was collected.</div>
+    <input type="hidden" name="payment_method" value="cash_on_delivery">
+    <p class="notice">Your address and phone number are saved to your account and copied to this order.</p>
+    <button class="btn btn-primary btn-full" type="submit">Place Order</button><a class="text-link center-link" href="{{ url_for('cart') }}">← Return to cart</a>
+  </form>
+</div></section>
+{% endblock %}

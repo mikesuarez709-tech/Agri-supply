@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Edit Product | Admin | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <div class="section-heading"><div><span class="eyebrow">ADMIN / PRODUCTS</span><h1>Edit product</h1></div><a class="btn btn-light" href="{{ url_for('admin_products') }}">← Products</a></div>
+  <form method="POST" enctype="multipart/form-data" class="admin-form">
+    <label>Product name<input name="product_name" value="{{ product['product_name'] }}" required></label>
+    <label>Category<select name="category_id" required>{% for category in categories %}<option value="{{ category['category_id'] }}" {% if category['category_id'] == product['category_id'] %}selected{% endif %}>{{ category['category_name'] }}</option>{% endfor %}</select></label>
+    <label>Supplier<select name="supplier_id"><option value="">Not assigned</option>{% for supplier in suppliers %}<option value="{{ supplier['supplier_id'] }}" {% if supplier['supplier_id'] == product['supplier_id'] %}selected{% endif %}>{{ supplier['supplier_name'] }}</option>{% endfor %}</select></label>
+    <label>Price (₱)<input type="number" name="price" min="0" step="0.01" value="{{ product['price'] }}" required></label>
+    <label>Unit<input name="unit" value="{{ product['unit'] }}" required></label>
+    <label>Image (leave empty to keep current)<input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label>
+    <label class="wide-field">Description<textarea name="description" rows="3">{{ product['description'] or '' }}</textarea></label>
+    <button class="btn btn-primary" type="submit">Save Product</button>
+  </form>
+  <p class="muted">Current image: {{ product['image_filename'] or 'No image assigned' }}</p>
+</div></section>
+{% endblock %}

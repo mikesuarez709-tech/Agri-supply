@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Edit Supplier | Admin | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <div class="section-heading"><div><span class="eyebrow">ADMIN / SUPPLIERS</span><h1>Edit supplier</h1></div><a class="btn btn-light" href="{{ url_for('admin_suppliers') }}">← Suppliers</a></div>
+  <form method="POST" class="admin-form">
+    <label>Supplier name<input name="supplier_name" value="{{ supplier['supplier_name'] }}" required></label>
+    <label>Contact person<input name="contact_person" value="{{ supplier['contact_person'] or '' }}"></label>
+    <label>Phone<input name="phone" value="{{ supplier['phone'] or '' }}"></label>
+    <label>Email<input type="email" name="email" value="{{ supplier['email'] or '' }}"></label>
+    <label class="wide-field">Address<input name="address" value="{{ supplier['address'] or '' }}"></label>
+    <button class="btn btn-primary" type="submit">Save Supplier</button>
+  </form>
+</div></section>
+{% endblock %}

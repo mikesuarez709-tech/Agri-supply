@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Reports | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <div class="section-heading">
+    <div><span class="eyebrow">ADMIN / REPORTS</span><h1>Sales reports</h1><p class="muted">Daily totals include transactions marked as paid.</p></div>
+    <div class="profile-actions"><a class="btn btn-primary" href="{{ url_for('export_sales_report') }}">Download CSV</a><a class="btn btn-light" href="{{ url_for('admin_dashboard') }}">← Dashboard</a></div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Date</th><th>Items sold</th><th>Paid sales</th></tr></thead><tbody>{% for row in sales %}<tr><td>{{ row['sales_day'] }}</td><td>{{ row['items_sold'] }}</td><td>₱{{ '%.2f'|format(row['total_sales']) }}</td></tr>{% else %}<tr><td colspan="3">No paid sales recorded yet.</td></tr>{% endfor %}</tbody></table></div>
+</div></section>
+{% endblock %}

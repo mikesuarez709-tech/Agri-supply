@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Track Order | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container tracking-layout">
+  <div class="tracking-header">
+    <span class="eyebrow">ORDER UPDATES</span>
+    <h1>Track your order</h1>
+    <p class="muted">See when your order is confirmed, prepared, shipped, and delivered.</p>
+    <form method="POST" class="tracking-search">
+      <label for="order-reference">Order reference</label>
+      <div><input id="order-reference" type="text" name="order_reference" value="{{ order_reference }}" required placeholder="Example: AGR-1-AB12CD34"><button class="btn btn-primary" type="submit">Track</button></div>
+    </form>
+  </div>
+  {% if order %}
+  <article class="tracking-card">
+    <div class="tracking-order-summary">
+      <div><small>ORDER REFERENCE</small><strong>{{ order['order_reference'] }}</strong></div>
+      <span class="status">{{ order['order_status']|title }}</span>
+    </div>
+    <div class="tracking-details">
+      <div><small>Order date</small><strong>{{ order['order_date'] }}</strong></div>
+      <div><small>Total</small><strong>₱{{ '%.2f'|format(order['total_amount']) }}</strong></div>
+      <div><small>Payment</small><strong>{{ order['payment_status']|title }}{% if order['payment_received_at'] %} · collected {{ order['payment_received_at'] }}{% endif %}</strong></div>
+      <div><small>Delivering to</small><strong>{{ order['delivery_address'] or '—' }}</strong></div>
+    </div>
+    {% if order['order_status'] == 'cancelled' %}
+    <div class="tracking-cancelled"><span class="tracking-dot"></span><div><strong>Order cancelled</strong><p>This order will not be delivered.</p></div></div>
+    {% else %}
+    <h2 class="tracking-section-title">Shipment progress</h2>
+    <ol class="tracking-timeline">
+      {% for event in tracking_events %}
+      <li class="tracking-event{% if loop.last %} is-current{% endif %}">
+        <span class="tracking-marker" aria-hidden="true"></span>
+        <div class="tracking-event-copy">
+          <strong>{{ event['label'] }}</strong>
+          {% if event['status'] == 'shipped' %}<p>Your parcel has left the seller and is on its way.</p>{% elif event['status'] == 'processing' %}<p>The seller is preparing your items for shipment.</p>{% elif event['status'] == 'confirmed' %}<p>The seller has confirmed your order.</p>{% elif event['status'] == 'delivered' %}<p>Your parcel has arrived.</p>{% elif event['status'] == 'pending' %}<p>Your order has been received.</p>{% endif %}
+          {% if event['changed_at'] %}<time>{{ event['changed_at'] }}</time>{% else %}<time>Status recorded</time>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+      {% if order['order_status'] != 'delivered' %}
+      <li class="tracking-event is-upcoming"><span class="tracking-marker" aria-hidden="true"></span><div class="tracking-event-copy"><strong>Delivered</strong><p>Waiting for delivery.</p></div></li>
+      {% endif %}
+    </ol>
+    {% endif %}
+  </article>
+  {% endif %}
+</div></section>
+{% endblock %}

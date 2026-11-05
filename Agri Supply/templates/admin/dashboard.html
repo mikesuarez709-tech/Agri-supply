@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <span class="eyebrow">ADMINISTRATION</span><h1>Admin dashboard</h1><p class="muted">Overview of your Agri Supply marketplace.</p>
+  <div class="stats-grid">
+    <div class="stat-card"><span>Products</span><strong>{{ stats.products }}</strong></div>
+    <div class="stat-card"><span>Suppliers</span><strong>{{ stats.suppliers }}</strong></div>
+    <div class="stat-card"><span>Customers</span><strong>{{ stats.customers }}</strong></div>
+    <div class="stat-card"><span>Paid sales</span><strong>₱{{ '%.2f'|format(stats.sales) }}</strong></div>
+    <div class="stat-card"><span>Open orders</span><strong>{{ stats.open_orders }}</strong></div>
+    <div class="stat-card"><span>Orders today</span><strong>{{ stats.today_orders }}</strong></div>
+    <div class="stat-card"><span>Low-stock products</span><strong>{{ stats.low_stock }}</strong></div>
+  </div>
+
+  <div class="section-heading"><div><h2>Recent orders</h2><p class="muted">Latest five orders across all customers.</p></div><a class="btn btn-light" href="{{ url_for('admin_transactions') }}">All orders</a></div>
+  <div class="table-wrap"><table><thead><tr><th>Reference</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th></tr></thead><tbody>
+    {% for order in recent_orders %}
+    <tr><td>{{ order['order_reference'] }}</td><td>{{ order['full_name'] or '—' }}</td><td>{{ order['order_date'] }}</td><td><span class="status">{{ order['order_status']|title }}</span></td><td>₱{{ '%.2f'|format(order['total_amount']) }}</td></tr>
+    {% else %}<tr><td colspan="5">No orders yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+
+  <div class="section-heading"><div><h2>Stock alerts</h2><p class="muted">Available products at or below their reorder level.</p></div><a class="btn btn-light" href="{{ url_for('admin_inventory') }}">Manage inventory</a></div>
+  <div class="table-wrap"><table><thead><tr><th>Product</th><th>Current stock</th><th>Reorder level</th></tr></thead><tbody>
+    {% for product in low_stock_products %}
+    <tr><td>{{ product['product_name'] }}</td><td><span class="status status-low">{{ product['quantity'] }} {{ product['unit'] }}</span></td><td>{{ product['reorder_level'] }} {{ product['unit'] }}</td></tr>
+    {% else %}<tr><td colspan="3">No low-stock products.</td></tr>{% endfor %}
+  </tbody></table></div>
+
+  <h2 class="subheading">Manage your system</h2>
+  <div class="dashboard-cards">
+    <a class="dashboard-tile" href="{{ url_for('admin_suppliers') }}"><span>👩‍🌾</span><h3>Suppliers</h3><p>Manage supplier records.</p></a>
+    <a class="dashboard-tile" href="{{ url_for('admin_products') }}"><span>🌾</span><h3>Products</h3><p>Add and manage products.</p></a>
+    <a class="dashboard-tile" href="{{ url_for('admin_inventory') }}"><span>📦</span><h3>Inventory</h3><p>Review stock quantities.</p></a>
+    <a class="dashboard-tile" href="{{ url_for('admin_customers') }}"><span>👥</span><h3>Customers</h3><p>View customer accounts.</p></a>
+    <a class="dashboard-tile" href="{{ url_for('admin_transactions') }}"><span>🧾</span><h3>Transactions</h3><p>Review customer orders.</p></a>
+    <a class="dashboard-tile" href="{{ url_for('admin_reports') }}"><span>📊</span><h3>Reports</h3><p>Review paid sales.</p></a>
+  </div>
+</div></section>
+{% endblock %}

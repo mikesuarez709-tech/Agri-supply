@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Products | Agri Supply{% endblock %}
+{% block content %}
+<section class="page-hero compact"><div class="container"><span class="eyebrow">OUR MARKETPLACE</span><h1>Rice & fresh vegetables</h1><p>Browse products available from our agricultural suppliers.</p></div></section>
+<section class="section"><div class="container">
+<form class="filter-bar" method="GET"><input type="search" name="q" value="{{ search }}" placeholder="Search products..."><select name="category"><option value="">All categories</option>{% for category in categories %}<option value="{{ category['category_name'] }}" {% if selected_category == category['category_name'] %}selected{% endif %}>{{ category['category_name'] }}</option>{% endfor %}</select><button class="btn btn-primary" type="submit">Search</button></form>
+<div class="product-grid">{% for product in products %}<article class="product-card"><a class="product-visual" href="{{ url_for('product_details', product_id=product['product_id']) }}">{% set image_url = product_image_url(product) %}{% if image_url %}<img src="{{ image_url }}" alt="{{ product['product_name'] }}">{% else %}<span class="image-fallback" role="img" aria-label="Image unavailable">i</span>{% endif %}<small>{{ product['category_name'] }}</small></a><div class="product-info"><h3><a href="{{ url_for('product_details', product_id=product['product_id']) }}">{{ product['product_name'] }}</a></h3><p class="product-meta">{{ product['quantity'] }} {{ product['unit'] }} available</p><div class="product-bottom"><strong>₱{{ '%.2f'|format(product['price']) }} <small>/ {{ product['unit'] }}</small></strong><a class="icon-button" href="{{ url_for('product_details', product_id=product['product_id']) }}">↗</a></div></div></article>{% else %}<div class="empty-state">No products matched your search.</div>{% endfor %}</div>
+</div></section>
+{% endblock %}

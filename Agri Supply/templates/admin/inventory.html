@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Inventory | Agri Supply{% endblock %}
+{% block content %}
+<section class="section"><div class="container">
+  <div class="section-heading"><div><span class="eyebrow">ADMIN / INVENTORY</span><h1>Inventory management</h1></div><a class="btn btn-light" href="{{ url_for('admin_dashboard') }}">← Dashboard</a></div>
+  <div class="table-wrap"><table><thead><tr><th>Product</th><th>Stock</th><th>Unit</th><th>Reorder level</th><th>Status</th><th>Adjust inventory</th></tr></thead><tbody>
+  {% for item in inventory %}<tr>
+    <td>{{ item['product_name'] }}</td><td>{{ item['quantity'] }}</td><td>{{ item['unit'] }}</td><td>{{ item['reorder_level'] }}</td>
+    <td>{% if item['quantity'] <= item['reorder_level'] %}<span class="status status-low">Low stock</span>{% else %}<span class="status">In stock</span>{% endif %}</td>
+    <td><form class="inventory-form" method="POST" action="{{ url_for('update_inventory', product_id=item['product_id']) }}"><label>Stock<input type="number" name="quantity" min="0" value="{{ item['quantity'] }}" required></label><label>Alert at<input type="number" name="reorder_level" min="0" value="{{ item['reorder_level'] }}" required></label><button class="btn btn-small btn-primary" type="submit">Save</button></form></td>
+  </tr>{% else %}<tr><td colspan="6">No inventory records found.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div></section>
+{% endblock %}

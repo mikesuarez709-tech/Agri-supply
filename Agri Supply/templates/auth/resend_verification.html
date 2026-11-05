@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Resend Verification | Agri Supply{% endblock %}
+{% block content %}
+<section class="auth-section">
+  <div class="auth-card">
+    <div class="auth-symbol">🌱</div>
+    <span class="eyebrow">ACCOUNT VERIFICATION</span>
+    <h1>Resend verification email</h1>
+    <p class="muted">Enter the email address used to register.</p>
+    <form method="POST" class="form-stack">
+      <label>Email address<input type="email" name="email" required maxlength="254" autocomplete="email"></label>
+      <button class="btn btn-primary btn-full" type="submit">Send Verification Link</button>
+    </form>
+    <p class="auth-switch"><a href="{{ url_for('login') }}">Back to login</a></p>
+  </div>
+</section>
+{% endblock %}

@@ -43,7 +43,7 @@ class AdminExportTests(unittest.TestCase):
         self.original_config = {
             key: agri_app.app.config[key]
             for key in (
-                "TESTING", "DATABASE", "SECRET_KEY", "MAIL_SERVER", "MAIL_PORT",
+                "TESTING", "DATABASE", "DB_TYPE", "SECRET_KEY", "MAIL_SERVER", "MAIL_PORT",
                 "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_DEFAULT_SENDER",
                 "MAIL_USE_TLS", "MAIL_USE_SSL", "PUBLIC_URL",
             )
@@ -52,6 +52,7 @@ class AdminExportTests(unittest.TestCase):
         agri_app.app.config.update(
             TESTING=True,
             DATABASE=str(database_path),
+            DB_TYPE="sqlite",
             SECRET_KEY="test-secret",
             MAIL_SERVER="smtp.example.com",
             MAIL_PORT=587,

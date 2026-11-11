@@ -30,7 +30,7 @@ class FakeConnection:
     def __init__(self):
         self.cursors = []
 
-    def cursor(self, dictionary=False):
+    def cursor(self, dictionary=False, buffered=False):
         cursor = FakeCursor(
             with_rows=True,
             rows=[{"user_id": 7, "email": "customer@example.com"}]

@@ -1,0 +1,5 @@
+Flask
+gunicorn; platform_system != "Windows"
+waitress; platform_system == "Windows"
+mysql-connector-python
+python-dotenv

@@ -166,7 +166,7 @@ class MySQLConnection:
             query = "START TRANSACTION"
         else:
             query = query.replace("?", "%s")
-        cursor = self._connection.cursor(dictionary=True)
+        cursor = self._connection.cursor(dictionary=True, buffered=True)
         try:
             cursor.execute(query, args)
         except mysql.connector.Error:
@@ -347,7 +347,7 @@ def get_db():
         if app.config["DB_TYPE"] == "mysql":
             mysql_config = app.config["MYSQL_CONFIG"]
             missing = [
-                key for key in ("host", "user", "password", "database")
+                key for key in ("host", "user", "database")
                 if not mysql_config[key]
             ]
             if missing:

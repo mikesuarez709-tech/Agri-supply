@@ -1,8 +1,14 @@
-# MySQL deployment setup
+# MySQL setup
 
-The application uses SQLite by default for local development. To use MySQL,
-create an empty MySQL database with your cloud provider, then set these
-environment variables in the deployment service:
+The app uses SQLite unless `DB_TYPE=mysql` is set. The local XAMPP database
+`agri_supply` has been created and populated from `database.db`. Its restricted
+application account and local connection settings are stored in the ignored
+`.env` file. Do not commit that file or share its password.
+
+Start MySQL from the XAMPP Control Panel before running the app. A local
+XAMPP database is only reachable from this computer; Render cannot connect to
+it. For deployment, create a separate cloud MySQL database and set these
+environment variables in the Render service:
 
 ```text
 DB_TYPE=mysql
@@ -18,10 +24,11 @@ in a local, untracked `.env` file. Never commit credentials to Git. Railway's
 `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, and `MYSQLDATABASE`
 variables are also recognized.
 
-## Create the schema and copy the current SQLite data
+## Migrate data into a new MySQL database
 
-Run these commands from the `Agri Supply` directory in an environment that can
-connect to the cloud MySQL host. The MySQL database should be empty:
+For a new database, run these commands from the `Agri Supply` directory in an
+environment that can connect to its MySQL host. The target database should be
+empty:
 
 ```powershell
 python -m flask --app app init-db

@@ -3,9 +3,8 @@ services:
     name: agri-supply
     runtime: python
     plan: free
-    rootDir: Agri Supply
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m flask --app app init-db && gunicorn app:app
+    buildCommand: pip install -r "Agri Supply/requirements.txt"
+    startCommand: cd "Agri Supply" && python -m flask --app app init-db && gunicorn app:app
     healthCheckPath: /
     envVars:
       - key: DB_TYPE

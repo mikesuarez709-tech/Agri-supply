@@ -742,18 +742,28 @@ def register():
             flash("Password must contain at least 8 characters.", "danger")
             return render_template("auth/register.html")
 
-        configuration_error = mail_configuration_error()
-        if configuration_error:
-            flash(configuration_error, "danger")
-            return render_template("auth/register.html")
+        email_verification_enabled = bool(
+            app.config["MAIL_SERVER"] and app.config["MAIL_DEFAULT_SENDER"]
+        )
+        if email_verification_enabled:
+            configuration_error = mail_configuration_error()
+            if configuration_error:
+                flash(configuration_error, "danger")
+                return render_template("auth/register.html")
 
         db = get_db()
         try:
             cursor = db.execute(
                 """INSERT INTO users
                    (full_name, email, password_hash, role, is_active, email_verified)
-                   VALUES (?, ?, ?, 'customer', 0, 0)""",
-                (full_name, email, generate_password_hash(password))
+                   VALUES (?, ?, ?, 'customer', ?, ?)""",
+                (
+                    full_name,
+                    email,
+                    generate_password_hash(password),
+                    int(not email_verification_enabled),
+                    int(not email_verification_enabled),
+                )
             )
             user_id = cursor.lastrowid
             db.execute(
@@ -761,12 +771,20 @@ def register():
                    VALUES (?, ?, ?)""",
                 (user_id, phone, address)
             )
-            token = create_account_token(db, user_id, "verify_email")
+            token = (
+                create_account_token(db, user_id, "verify_email")
+                if email_verification_enabled
+                else None
+            )
             db.commit()
         except DATABASE_INTEGRITY_ERRORS:
             db.rollback()
             flash("That email address is already registered.", "danger")
             return render_template("auth/register.html")
+
+        if not email_verification_enabled:
+            flash("Your account is ready. You can log in now.", "success")
+            return redirect(url_for("login"))
 
         user = query_db(
             "SELECT user_id, full_name, email FROM users WHERE user_id = ?",

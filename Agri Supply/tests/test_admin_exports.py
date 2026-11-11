@@ -146,6 +146,46 @@ class AdminExportTests(unittest.TestCase):
         response = self.client.get("/admin/reports/export.csv")
         self.assertEqual(response.status_code, 403)
 
+    def test_registration_without_smtp_creates_login_ready_customer(self):
+        agri_app.app.config["MAIL_SERVER"] = ""
+        agri_app.app.config["MAIL_DEFAULT_SENDER"] = ""
+
+        response = self.client.post(
+            "/register",
+            data={
+                "full_name": "New Customer",
+                "email": "not-a-real-inbox@example.com",
+                "password": "customer-password",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/login")
+        db = sqlite3.connect(agri_app.app.config["DATABASE"])
+        try:
+            user = db.execute(
+                "SELECT role, is_active, email_verified FROM users "
+                "WHERE email = ?",
+                ("not-a-real-inbox@example.com",),
+            ).fetchone()
+            token_count = db.execute(
+                "SELECT COUNT(*) FROM account_tokens"
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(user, ("customer", 1, 1))
+        self.assertEqual(token_count, 0)
+
+        login = self.client.post(
+            "/login",
+            data={
+                "email": "not-a-real-inbox@example.com",
+                "password": "customer-password",
+            },
+        )
+        self.assertEqual(login.status_code, 302)
+        self.assertEqual(login.headers["Location"], "/customer/dashboard")
+
     def test_test_email_cli_uses_configured_smtp(self):
         runner = agri_app.app.test_cli_runner()
         FakeSMTP.sent_messages.clear()

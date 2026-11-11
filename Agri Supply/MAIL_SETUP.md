@@ -1,7 +1,9 @@
 # Email setup
 
-Email verification and password recovery require an SMTP account. The application
-does not send mail until the settings below are configured. Keep credentials in
+Email verification, password recovery, and order notifications require an SMTP
+account. Without SMTP settings, customer registrations are activated immediately
+without verifying ownership of the supplied email address. The application does
+not send mail until the settings below are configured. Keep credentials in
 environment variables; do not put real passwords in source files.
 
 For Gmail, use `smtp.gmail.com`, port `587`, and TLS. Gmail SMTP authentication

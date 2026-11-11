@@ -637,6 +637,42 @@ def create_admin_command(email, name):
     click.echo(f"Administrator account created for {email}.")
 
 
+@app.cli.command("bootstrap-admin")
+def bootstrap_admin_command():
+    """Create the configured administrator once during service startup."""
+    email = os.environ.get("AGRI_ADMIN_EMAIL", "").strip().lower()
+    password = os.environ.get("AGRI_ADMIN_PASSWORD", "")
+    if not email and not password:
+        click.echo("No bootstrap administrator configured.")
+        return
+    if not is_valid_email(email):
+        raise click.ClickException("AGRI_ADMIN_EMAIL must be a valid email address.")
+    if len(password) < 12:
+        raise click.ClickException(
+            "AGRI_ADMIN_PASSWORD must contain at least 12 characters."
+        )
+
+    db = get_db()
+    existing_user = db.execute(
+        "SELECT role FROM users WHERE email = ?", (email,)
+    ).fetchone()
+    if existing_user is not None:
+        if existing_user["role"] != "admin":
+            raise click.ClickException(
+                "The bootstrap email belongs to a non-admin account."
+            )
+        click.echo(f"Bootstrap administrator {email} already exists.")
+        return
+
+    db.execute(
+        """INSERT INTO users (full_name, email, password_hash, role)
+           VALUES (?, ?, ?, 'admin')""",
+        ("Administrator", email, generate_password_hash(password))
+    )
+    db.commit()
+    click.echo(f"Bootstrap administrator {email} created.")
+
+
 @app.cli.command("test-email")
 @click.option("--email", prompt=True, help="Address that should receive a test email.")
 def test_email_command(email):

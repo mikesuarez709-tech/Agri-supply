@@ -186,6 +186,35 @@ class AdminExportTests(unittest.TestCase):
         self.assertEqual(login.status_code, 302)
         self.assertEqual(login.headers["Location"], "/customer/dashboard")
 
+    def test_bootstrap_admin_creates_admin_idempotently(self):
+        runner = agri_app.app.test_cli_runner()
+        env = {
+            "AGRI_ADMIN_EMAIL": "render-admin@example.com",
+            "AGRI_ADMIN_PASSWORD": "unique-admin-password-2026",
+        }
+
+        result = runner.invoke(args=["bootstrap-admin"], env=env)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn(
+            "Bootstrap administrator render-admin@example.com created.",
+            result.output,
+        )
+
+        result = runner.invoke(args=["bootstrap-admin"], env=env)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("already exists", result.output)
+        db = sqlite3.connect(agri_app.app.config["DATABASE"])
+        try:
+            admins = db.execute(
+                "SELECT COUNT(*) FROM users WHERE email = ? AND role = 'admin'",
+                ("render-admin@example.com",),
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(admins, 1)
+
     def test_test_email_cli_uses_configured_smtp(self):
         runner = agri_app.app.test_cli_runner()
         FakeSMTP.sent_messages.clear()
